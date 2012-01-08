@@ -37,6 +37,7 @@ public class MoveContext {
     public int cardCostModifier = 0;
     public int victoryCardsBoughtThisTurn = 0;
     public int totalCardsBoughtThisTurn = 0;
+    public boolean buyPhase = false;
     public ArrayList<Card> cantBuy = new ArrayList<Card>();
     public Player getPossessedBy() { return game.possessingPlayer; };
     public ArrayList<Card> possessedTrashPile = new ArrayList<Card>();
@@ -86,6 +87,22 @@ public class MoveContext {
         return cantBuy;
     }
 
+    public int getActionCardsInPlayThisTurn() {
+        int actionsInPlay = 0;
+        for(Card c : getPlayedCards()) {
+            if(c instanceof ActionCard) {
+                actionsInPlay++;
+            }
+        }
+        for(Card c : player.nextTurnCards) {
+            if(c instanceof ActionCard) {
+                actionsInPlay++;
+            }
+        }
+
+        return actionsInPlay;
+    }
+    
     public int getVictoryCardsBoughtThisTurn() {
         return victoryCardsBoughtThisTurn;
     }

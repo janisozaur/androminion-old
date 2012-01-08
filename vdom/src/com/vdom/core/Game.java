@@ -120,7 +120,7 @@ public class Game {
 
             checkForInteractive();
 
-            Util.log("");
+            Util.debug("");
 
             // Start game(s)
             if (gameTypeStr != null) {
@@ -328,6 +328,7 @@ public class Game {
         context.gold = context.addGold;
         context.addGold = 0;
         context.potions = 0;
+        context.buyPhase = true;
 
         boolean selectingCoins = playerShouldSelectCoinsToPlay(context, player.getHand());
         ArrayList<TreasureCard> treasures = null;
@@ -509,6 +510,7 @@ public class Game {
         // /////////////////////////////////
         // Reset context for status update
         // /////////////////////////////////
+        context.actionsPlayedSoFar = 0;
         context.actions = 1;
         context.buys = 1;
         context.addGold = 0;
@@ -546,7 +548,7 @@ public class Game {
                     }
                 }
             } else {
-                Util.log("Error:");
+                Util.debug("Error:Invalid action selected");
                 action = null;
             }
         } while (context.actions > 0 && action != null);
@@ -575,7 +577,7 @@ public class Game {
                 }
             }
         } while (context.buys > 0 && buy != null);
-
+        context.buyPhase = false;
     }
 
     protected void turnBegin(Player player, MoveContext context) {
@@ -588,6 +590,7 @@ public class Game {
                     event.card = thisCard;
                     broadcastEvent(event);
 
+                    context.actionsPlayedSoFar++;
                     context.actions += thisCard.getAddActionsNextTurn();
                     context.addGold += thisCard.getAddGoldNextTurn();
                     context.buys += thisCard.getAddBuysNextTurn();
@@ -598,7 +601,7 @@ public class Game {
 
                 }
             } else if (!card.equals(Cards.throneRoom) && !card.equals(Cards.kingsCourt)) {
-                System.out.println("Bad duration card: " + card);
+                Util.debug(player, "Bad duration card: " + card);
             }
             ((CardImpl) card).cloneCount = 1;
         }
@@ -933,11 +936,7 @@ public class Game {
         }
 
         if (numGames == -1) {
-            if (debug) {
-                numGames = 1;
-            } else {
-                numGames = 20;
-            }
+        	numGames = 1;
         }
 
     }
@@ -991,21 +990,8 @@ public class Game {
             return false;
         }
 
-        int cost = card.getCost(context);
+        int cost = card.getCost(context, true);
         
-        // Adjust cost based on any cards played or card being bought
-        if (context.quarriesPlayed > 0 && card instanceof ActionCard) {
-            cost -= (context.quarriesPlayed * 2);
-        } 
-        if (card.equals(Cards.peddler)) {
-            for(Card c : context.getPlayedCards()) {
-                if(c instanceof ActionCard) {
-                    cost -= 2;
-                }
-            }
-        } 
-
-        cost = (cost < 0 ? 0 : cost);
         int potions = 0;
         for (Card thisCard : context.getPlayedCards()) {
             if (thisCard instanceof TreasureCard && ((TreasureCard) thisCard).providePotion()) {
@@ -1030,22 +1016,10 @@ public class Game {
 	        event.newCard = true;
 	        broadcastEvent(event);
 	
+            // cost adjusted based on any cards played or card being bought
 	        int cost = card.getCost(context);
-	        
-	        // Adjust cost based on any cards played or card being bought
-	        if (context.quarriesPlayed > 0 && card instanceof ActionCard) {
-	            cost -= (context.quarriesPlayed * 2);
-	        } 
-	        if (card.equals(Cards.peddler)) {
-	            for(Card c : ((MoveContext) context).getPlayedCards()) {
-	                if(c instanceof ActionCard) {
-	                    cost -= 2;
-	                }
-	            }
-	        } 
-	        
-	        cost = (cost < 0 ? 0 : cost);
-	        context.gold -= cost;
+
+            context.gold -= card.getCost(context);
 	        
 	        if (card.costPotion()) {
 	            context.potions--;
@@ -1184,7 +1158,7 @@ public class Game {
             }
 
             if (event.getType() == GameEvent.Type.TurnEnd) {
-                System.out.println();
+                Util.debug("");
                 return;
             }
 
@@ -1211,7 +1185,7 @@ public class Game {
                 msg.append(event.getComment());
             }
 
-            System.out.println(msg.toString());
+            Util.debug(msg.toString());
         }
     }
 
@@ -1399,7 +1373,6 @@ public class Game {
                 
                 if(card != null
                     && !card.equals(Cards.possession)
-                    && !card.equals(Cards.golem)
                     ) {
                     addPile(card);
                     added += 1;
@@ -1410,14 +1383,19 @@ public class Game {
                 			s.equalsIgnoreCase(Cards.copper.getSafeName()) ||
                 			s.equalsIgnoreCase(Cards.silver.getSafeName()) ||
                 			s.equalsIgnoreCase(Cards.potion.getSafeName()) ||
-                			s.equalsIgnoreCase(Cards.gold.getSafeName()) ) {
+                			s.equalsIgnoreCase(Cards.gold.getSafeName()) ||
+                			s.equalsIgnoreCase(Cards.diadem.getSafeName()) ||
+                			s.equalsIgnoreCase(Cards.followers.getSafeName()) ||
+                			s.equalsIgnoreCase(Cards.princess.getSafeName()) ||
+                			s.equalsIgnoreCase(Cards.trustySteed.getSafeName()) ||
+                			s.equalsIgnoreCase(Cards.bagOfGold.getSafeName()) ) {
                 	// do nothing
                 } else if ( s.equalsIgnoreCase(Cards.platinum.getSafeName()) ||
                 			s.equalsIgnoreCase(Cards.colony.getSafeName()) ) {
                     platColonyPassedIn = true;
                 } else {
                     unfoundCards.add(s);
-                    Util.log("ERROR::Could not find card:" + s);
+                    Util.debug("ERROR::Could not find card:" + s);
                 }
             }
             
@@ -1441,9 +1419,6 @@ public class Game {
                 else if(s.equalsIgnoreCase("possession")) {
                     // Not exact, since it requires potion as well, but good enough...
                     replacementCost = 6;
-                }
-                else if(s.equalsIgnoreCase("golem")) {
-                    replacementCost = 4;
                 }
                 
                 if(replacementCost != -1) {
@@ -2361,6 +2336,7 @@ public class Game {
                     if(context.getPossessedBy() != null) {
                         player = context.getPossessedBy();
                     }
+                    Util.debug((String.format("discard pile: %d", player.discard.size())), true);
                     
                     // See rules explanation of Tunnel for what commandedDiscard means.
                     boolean commandedDiscard = true;
@@ -2497,16 +2473,19 @@ public class Game {
                         }
                     } else if(event.card.equals(Cards.inn)) {
                         ArrayList<Card> cards = new ArrayList<Card>();
+                        int actionCardsFound = 0;
                         for(int i=player.discard.size() - 1; i >= 0; i--) {
                             Card c = player.discard.get(i);
                             if(c instanceof ActionCard) {
+                                actionCardsFound++;
                                 if((player).inn_shuffleCardBackIntoDeck(event.getContext(), (ActionCard) c)) {
                                     cards.add(c);
                                 }
                             }
                         }
-                        
-                        if(cards.size() > 0) {
+
+                        Util.debug((String.format("Inn: %d action(s) found in %d-card discard pile", actionCardsFound, player.discard.size())), true);
+                        if (cards.size() > 0) {
                             for(Card c : cards) {
                                 player.discard.remove(c);
                                 player.deck.add(c);

@@ -142,7 +142,7 @@ public class Androminion extends Activity implements EventHandler {
 			port = extras.getInt("port");
 			if (host != null && port != 0) {
 				// handle(new Event(Event.EType.SETHOST).setString(host).setInteger(port));
-				System.out.println("Wants to connect to dom://" + host + ":" + port);
+				debug("Wants to connect to dom://" + host + ":" + port);
 				new HostDialog(this, host, port);
 				return;
 			}
@@ -151,6 +151,14 @@ public class Androminion extends Activity implements EventHandler {
 		host = prefs.getString("host", DEFAULT_HOST);
 		port = prefs.getInt("port", DEFAULT_PORT);
 
+		if (!prefs.getString("LastVersion", "None").equals(getString(R.string.version))) {
+			SharedPreferences.Editor edit = prefs.edit();
+			edit.putString("LastVersion", getString(R.string.version));
+			edit.commit();
+
+			new AboutDialog(this, true);
+		}
+		
 		// ds = new DominionServer(top);
 		// quickstart();
 	}
